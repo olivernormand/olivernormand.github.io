@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Normand Munro Map</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,400;0,500;0,700&family=DM+Serif+Display&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+    background: #1a1d23;
+    color: #d4d0c8;
+    min-height: 100vh;
+  }
+
+  /* --- Header --- */
+  .header {
+    padding: 2rem 2rem 0.5rem;
+    text-align: center;
+  }
+  .header h1 {
+    font-family: 'DM Serif Display', Georgia, serif;
+    font-size: 2rem;
+    font-weight: 400;
+    color: #e8e4da;
+    letter-spacing: 0.01em;
+  }
+  .header .subtitle {
+    color: #8a8578;
+    font-size: 0.85rem;
+    margin-top: 0.3rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  /* --- Stats row --- */
+  .stats-row {
+    display: flex;
+    justify-content: center;
+    align-items: stretch;
+    gap: 0;
+    max-width: 900px;
+    margin: 1.25rem auto 0;
+    padding: 0 2rem;
+  }
+  .stat-item {
+    flex: 1;
+    text-align: center;
+    padding: 1rem 0.5rem;
+    position: relative;
+  }
+  .stat-item:not(:last-child)::after {
+    content: '';
+    position: absolute;
+    right: 0;
+    top: 20%;
+    height: 60%;
+    width: 1px;
+    background: #2e3038;
+  }
+  .stat-item .number {
+    font-family: 'DM Serif Display', Georgia, serif;
+    font-size: 1.8rem;
+    line-height: 1;
+  }
+  .stat-item .label {
+    font-size: 0.65rem;
+    color: #6b6760;
+    margin-top: 0.4rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+  }
+
+  /* --- Stacked progress --- */
+  .progress-section {
+    max-width: 900px;
+    margin: 1rem auto;
+    padding: 0 2rem;
+  }
+  .progress-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 0.5rem;
+  }
+  .progress-name {
+    font-size: 0.75rem;
+    font-weight: 500;
+    width: 50px;
+    text-align: right;
+    color: #a09a90;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .progress-track {
+    flex: 1;
+    height: 6px;
+    background: #252830;
+    border-radius: 3px;
+    overflow: hidden;
+    display: flex;
+  }
+  .progress-seg {
+    height: 100%;
+  }
+  .progress-seg:first-child {
+    border-radius: 3px 0 0 3px;
+  }
+  .progress-seg:last-child {
+    border-radius: 0 3px 3px 0;
+  }
+  .progress-pct {
+    font-size: 0.75rem;
+    color: #6b6760;
+    width: 70px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* --- Legend / filter toggles --- */
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.25rem;
+    padding: 0.75rem 2rem;
+    max-width: 900px;
+    margin: 0 auto;
+  }
+  .legend-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.7rem;
+    color: #a09a90;
+    padding: 0.35rem 0.7rem;
+    border-radius: 100px;
+    border: 1px solid #2e3038;
+    background: transparent;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-family: inherit;
+    letter-spacing: 0.02em;
+  }
+  .legend-btn:hover {
+    border-color: #4a4840;
+    background: #22252b;
+  }
+  .legend-btn.inactive {
+    opacity: 0.35;
+  }
+  .legend-btn.inactive:hover {
+    opacity: 0.55;
+  }
+  .legend-peak {
+    width: 0;
+    height: 0;
+    border-left: 5px solid transparent;
+    border-right: 5px solid transparent;
+    border-bottom: 8px solid;
+  }
+  .download-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.7rem;
+    color: #6b6760;
+    padding: 0.35rem 0.7rem;
+    border-radius: 100px;
+    border: 1px solid #2e3038;
+    background: transparent;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-family: inherit;
+    letter-spacing: 0.02em;
+    margin-left: 0.5rem;
+  }
+  .download-btn:hover {
+    border-color: #4a4840;
+    background: #22252b;
+    color: #a09a90;
+  }
+
+  /* --- Map --- */
+  #map {
+    height: calc(100vh - 280px);
+    min-height: 400px;
+    margin: 0.5rem 2rem 2rem;
+    border-radius: 8px;
+    border: 1px solid #2e3038;
+  }
+
+  .leaflet-popup-content-wrapper {
+    background: #1a1d23;
+    color: #d4d0c8;
+    border-radius: 6px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+    border: 1px solid #2e3038;
+  }
+  .leaflet-popup-tip {
+    background: #1a1d23;
+    border: 1px solid #2e3038;
+    box-shadow: none;
+  }
+  .leaflet-popup-content {
+    margin: 10px 14px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.85rem;
+    line-height: 1.4;
+  }
+  .leaflet-popup-content b {
+    font-family: 'DM Serif Display', Georgia, serif;
+    font-weight: 400;
+    font-size: 0.95rem;
+  }
+  .popup-cat {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-top: 2px;
+  }
+
+  /* Leaflet control styling */
+  .leaflet-control-zoom a {
+    background: #1a1d23 !important;
+    color: #a09a90 !important;
+    border-color: #2e3038 !important;
+  }
+  .leaflet-control-zoom a:hover {
+    background: #22252b !important;
+    color: #e8e4da !important;
+  }
+  .leaflet-control-attribution {
+    background: rgba(26,29,35,0.8) !important;
+    color: #4a4840 !important;
+    font-size: 0.6rem !important;
+  }
+  .leaflet-control-attribution a {
+    color: #6b6760 !important;
+  }
+
+  @media (max-width: 640px) {
+    .header { padding: 1.5rem 1rem 0.25rem; }
+    .header h1 { font-size: 1.5rem; }
+    .stats-row { padding: 0 1rem; }
+    .stat-item .number { font-size: 1.4rem; }
+    .stat-item .label { font-size: 0.55rem; }
+    .progress-section { padding: 0 1rem; }
+    .legend { padding: 0.5rem 1rem; }
+    #map { margin: 0.5rem 1rem 1rem; height: calc(100vh - 300px); }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>The Normand Munro Map</h1>
+  <div class="subtitle">282 Munros &mdash; Oliver &amp; Dad</div>
+</div>
+
+<div class="stats-row">
+  <div class="stat-item">
+    <div class="number" style="color: #e6c84e;">103</div>
+    <div class="label">Together</div>
+  </div>
+  <div class="stat-item">
+    <div class="number" style="color: #c45bdb;">30</div>
+    <div class="label">Both, Apart</div>
+  </div>
+  <div class="stat-item">
+    <div class="number" style="color: #4da6e8;">26</div>
+    <div class="label">Oliver Only</div>
+  </div>
+  <div class="stat-item">
+    <div class="number" style="color: #e87c3e;">26</div>
+    <div class="label">Dad Only</div>
+  </div>
+  <div class="stat-item">
+    <div class="number" style="color: #888;">97</div>
+    <div class="label">Neither</div>
+  </div>
+</div>
+
+<div class="progress-section">
+  <div class="progress-row">
+    <div class="progress-name">Oliver</div>
+    <div class="progress-track">
+      <div class="progress-seg" style="width: 36.52%; background: #e6c84e;" title="Together: 103"></div>
+      <div class="progress-seg" style="width: 10.64%; background: #c45bdb;" title="Both apart: 30"></div>
+      <div class="progress-seg" style="width: 9.22%; background: #4da6e8;" title="Oliver only: 26"></div>
+    </div>
+    <div class="progress-pct">159 / 282</div>
+  </div>
+  <div class="progress-row">
+    <div class="progress-name">Dad</div>
+    <div class="progress-track">
+      <div class="progress-seg" style="width: 36.52%; background: #e6c84e;" title="Together: 103"></div>
+      <div class="progress-seg" style="width: 10.64%; background: #c45bdb;" title="Both apart: 30"></div>
+      <div class="progress-seg" style="width: 9.22%; background: #e87c3e;" title="Dad only: 26"></div>
+    </div>
+    <div class="progress-pct">159 / 282</div>
+  </div>
+</div>
+
+<div class="legend" id="legend">
+  <button class="legend-btn" data-cat="together">
+    <div class="legend-peak" style="border-bottom-color: #e6c84e;"></div>Together
+  </button>
+  <button class="legend-btn" data-cat="both_separate">
+    <div class="legend-peak" style="border-bottom-color: #c45bdb;"></div>Both, Apart
+  </button>
+  <button class="legend-btn" data-cat="oliver_only">
+    <div class="legend-peak" style="border-bottom-color: #4da6e8;"></div>Oliver Only
+  </button>
+  <button class="legend-btn" data-cat="dad_only">
+    <div class="legend-peak" style="border-bottom-color: #e87c3e;"></div>Dad Only
+  </button>
+  <button class="legend-btn" data-cat="neither">
+    <div class="legend-peak" style="border-bottom-color: #ffffff;"></div>Neither
+  </button>
+  <button class="download-btn" onclick="downloadCSV()">&#8595; CSV</button>
+</div>
+
+<div id="map"></div>
+
+<script>
+const data = {"together": [{"name": "A' Bhuidheanach Bheag", "lat": 56.8704825, "lng": -4.1989073}, {"name": "A' Chailleach (Fannichs)", "lat": 57.6939247, "lng": -5.1286991}, {"name": "Am Basteir", "lat": 57.2479533, "lng": -6.2029709}, {"name": "Am Faochagach", "lat": 57.7719037, "lng": -4.854089}, {"name": "An Coileachan", "lat": 57.667731, "lng": -4.9495854}, {"name": "An St\u00f9c", "lat": 56.5602791, "lng": -4.2160934}, {"name": "Aonach Air Chrith", "lat": 57.1245648, "lng": -5.2214387}, {"name": "Aonach Meadhoin", "lat": 57.1729061, "lng": -5.2292313}, {"name": "Beinn Fhionnlaidh (C\u00e0rn Eige)", "lat": 57.3060286, "lng": -5.129985}, {"name": "Beinn Ghlas", "lat": 56.5360446, "lng": -4.237057}, {"name": "Beinn Liath Mh\u00f2r Fannaich", "lat": 57.7061187, "lng": -4.9897439}, {"name": "Ben Hope", "lat": 58.4131433, "lng": -4.6080353}, {"name": "Ben Lawers", "lat": 56.544916, "lng": -4.2207949}, {"name": "Ben Lomond", "lat": 56.1903252, "lng": -4.6332483}, {"name": "Ben Macdui", "lat": 57.070437, "lng": -3.66912}, {"name": "Ben More", "lat": 56.3859754, "lng": -4.5402148}, {"name": "Ben Nevis", "lat": 56.7969455, "lng": -5.0036945}, {"name": "Ben Wyvis", "lat": 57.6789438, "lng": -4.5791712}, {"name": "Bidein a' Ghlas Thuill (An Teallach)", "lat": 57.8072646, "lng": -5.2518594}, {"name": "Bl\u00e0 Bheinn", "lat": 57.2197035, "lng": -6.09335}, {"name": "Braeriach", "lat": 57.0782949, "lng": -3.7287124}, {"name": "Broad Cairn", "lat": 56.9191891, "lng": -3.249394}, {"name": "Bruach na Fr\u00ecthe", "lat": 57.246928, "lng": -6.210857}, {"name": "Bynack More", "lat": 57.1378952, "lng": -3.5849537}, {"name": "Cairn Bannoch", "lat": 56.9277974, "lng": -3.2783688}, {"name": "Cairn Gorm", "lat": 57.1166048, "lng": -3.6439483}, {"name": "Cairn of Claise", "lat": 56.8942623, "lng": -3.3386308}, {"name": "C\u00e0rn a' Choire Bh\u00f2idheach", "lat": 56.9458509, "lng": -3.2727118}, {"name": "C\u00e0rn an t-Sagairt M\u00f2r", "lat": 56.9438602, "lng": -3.3031369}, {"name": "C\u00e0rn Eige", "lat": 57.2877855, "lng": -5.1151532}, {"name": "C\u00e0rn Gorm", "lat": 56.6226702, "lng": -4.2260368}, {"name": "C\u00e0rn Liath (Creag Meagaidh)", "lat": 56.9788972, "lng": -4.515347}, {"name": "C\u00e0rn Mairg", "lat": 56.6347415, "lng": -4.1456974}, {"name": "C\u00e0rn M\u00f2r Dearg", "lat": 56.805346, "lng": -4.9866384}, {"name": "C\u00e0rn na Caim", "lat": 56.9118269, "lng": -4.174486}, {"name": "Creag a'Mh\u00e0im", "lat": 57.1210161, "lng": -5.1601578}, {"name": "Creag Meagaidh", "lat": 56.9521401, "lng": -4.6021594}, {"name": "Creag Mh\u00f2r (Meall na Aighean)", "lat": 56.6206699, "lng": -4.1287385}, {"name": "Creag nan D\u00e0mh", "lat": 57.1473517, "lng": -5.3347386}, {"name": "Derry Cairngorm", "lat": 57.0629513, "lng": -3.6220177}, {"name": "Driesh", "lat": 56.8480525, "lng": -3.1965161}, {"name": "Druim Shionnach", "lat": 57.1268757, "lng": -5.1828264}, {"name": "Gairich", "lat": 57.0451065, "lng": -5.255949}, {"name": "Garbh Chioch Mh\u00f2r", "lat": 57.0086198, "lng": -5.4444924}, {"name": "Inaccessible Pinnacle", "lat": 57.2137457, "lng": -6.2345787}, {"name": "Ladhar Bheinn", "lat": 57.0753, "lng": -5.5919}, {"name": "Lochnagar", "lat": 56.9603353, "lng": -3.2452417}, {"name": "Luinne Bheinn", "lat": 57.0490565, "lng": -5.5150258}, {"name": "M\u00e0m Sodhail", "lat": 57.2798687, "lng": -5.1204087}, {"name": "Maol chinn-dearg", "lat": 57.127453, "lng": -5.2526513}, {"name": "Mayar", "lat": 56.8489705, "lng": -3.2463185}, {"name": "Meall a' Choire L\u00e8ith", "lat": 56.5664971, "lng": -4.2597616}, {"name": "Meall a' Chrasgaidh", "lat": 57.7128898, "lng": -5.0487291}, {"name": "Meall Buidhe (Glen Lyon)", "lat": 56.6172785, "lng": -4.4488244}, {"name": "Meall Buidhe (Knoydart)", "lat": 57.03167, "lng": -5.5464245}, {"name": "Meall Corranaich", "lat": 56.5409951, "lng": -4.253487}, {"name": "Meall Garbh (Ben Lawers)", "lat": 56.5651477, "lng": -4.2083911}, {"name": "Meall Garbh (C\u00e0rn Mairg)", "lat": 56.6375674, "lng": -4.2076188}, {"name": "Meall Ghaordaidh", "lat": 56.5258946, "lng": -4.416647}, {"name": "Meall Gorm", "lat": 57.6808623, "lng": -4.9836257}, {"name": "Meall Greigh", "lat": 56.5674897, "lng": -4.1595953}, {"name": "Meall na Teanga", "lat": 56.9889214, "lng": -4.9311224}, {"name": "Meall nan Tarmachan", "lat": 56.5217814, "lng": -4.3013652}, {"name": "Mullach an Rathain (Liathach)", "lat": 57.5610276, "lng": -5.4925144}, {"name": "Mullach Clach a' Bhl\u00e0ir", "lat": 57.0120164, "lng": -3.841279}, {"name": "S\u00e0ileag", "lat": 57.1813497, "lng": -5.2814132}, {"name": "Schiehallion", "lat": 56.6670069, "lng": -4.1002399}, {"name": "Sg\u00f2r an Lochain Uaine", "lat": 57.0583302, "lng": -3.7257213}, {"name": "Sg\u00f2r Gaoith", "lat": 57.0686776, "lng": -3.8111209}, {"name": "Sg\u00f9rr a' Bhealaich Dheirg", "lat": 57.1778853, "lng": -5.2522865}, {"name": "Sg\u00f9rr a' Ghreadaidh", "lat": 57.227584, "lng": -6.2344061}, {"name": "Sg\u00f9rr a' Mhadaidh", "lat": 57.230967, "lng": -6.2320184}, {"name": "Sg\u00f9rr Alasdair", "lat": 57.20655, "lng": -6.2242676}, {"name": "Sg\u00f9rr an Doire Leathain", "lat": 57.1370897, "lng": -5.2815359}, {"name": "Sg\u00f9rr an Lochain", "lat": 57.1413713, "lng": -5.2974584}, {"name": "Sg\u00f9rr Breac", "lat": 57.6921587, "lng": -5.0917029}, {"name": "Sg\u00f9rr Ch\u00f2innich M\u00f2r", "lat": 56.8005, "lng": -4.9041192}, {"name": "Sg\u00f9rr Dubh M\u00f2r", "lat": 57.204917, "lng": -6.2119409}, {"name": "Sg\u00f9rr Fhuaran", "lat": 57.1962029, "lng": -5.3479714}, {"name": "Sg\u00f9rr Fiona (An Teallach)", "lat": 57.8009182, "lng": -5.2595712}, {"name": "Sg\u00f9rr Mhic Ch\u00f2innich", "lat": 57.2089163, "lng": -6.2241804}, {"name": "Sg\u00f9rr M\u00f2r", "lat": 57.7001156, "lng": -5.0169702}, {"name": "Sg\u00f9rr M\u00f2r (Beinn Alligin)", "lat": 57.5912536, "lng": -5.5729287}, {"name": "Sg\u00f9rr M\u00f2r (Loch Cuaich)", "lat": 57.0284993, "lng": -5.3544644}, {"name": "Sg\u00f9rr na Banachdich", "lat": 57.2210007, "lng": -6.2416779}, {"name": "Sg\u00f9rr na C\u00e0rnach", "lat": 57.189047, "lng": -5.3493301}, {"name": "Sg\u00f9rr na C\u00ecche", "lat": 57.0135116, "lng": -5.457219}, {"name": "Sg\u00f9rr na Ciste Duibhe", "lat": 57.1809962, "lng": -5.3373182}, {"name": "Sg\u00f9rr nan Coireachan (Glen Dessary)", "lat": 57.0072355, "lng": -5.405689}, {"name": "Sg\u00f9rr nan Eag", "lat": 57.1957767, "lng": -6.2112862}, {"name": "Sg\u00f9rr nan Gillean", "lat": 57.2486284, "lng": -6.1929542}, {"name": "Spidean a' Choire L\u00e8ith (Liathach)", "lat": 57.5643525, "lng": -5.4636858}, {"name": "Sr\u00f2n a' Choire Ghairbh", "lat": 57.0079319, "lng": -4.9287968}, {"name": "Stob B\u00e0n (Grey Corries)", "lat": 56.8107593, "lng": -4.8410368}, {"name": "Stob Binnein", "lat": 56.370748, "lng": -4.5359361}, {"name": "Stob Choire Claurigh", "lat": 56.8240012, "lng": -4.8499147}, {"name": "Stob Coire an Laoigh", "lat": 56.8109632, "lng": -4.8850469}, {"name": "Stob Poite Coire \u00c0rdair", "lat": 56.9643025, "lng": -4.5855253}, {"name": "St\u00f9cd an Lochain", "lat": 56.570977, "lng": -4.4706771}, {"name": "Tolmount", "lat": 56.9053148, "lng": -3.2985492}, {"name": "Tom a' Ch\u00f2inich", "lat": 57.2995829, "lng": -5.0490043}, {"name": "Tom Buidhe", "lat": 56.8937042, "lng": -3.2923891}, {"name": "Tom na Gruagaich (Beinn Alligin)", "lat": 57.5806349, "lng": -5.5819871}], "both_separate": [{"name": "An Socach (Braemar)", "lat": 56.902059, "lng": -3.5122028}, {"name": "Aonach Beag (Alder)", "lat": 56.8334954, "lng": -4.5291555}, {"name": "Beinn a' Bh\u00f9ird", "lat": 57.0876537, "lng": -3.4993939}, {"name": "Beinn a' Chaorainn (Cairngorms)", "lat": 57.0932681, "lng": -3.5773578}, {"name": "Beinn a' Chlachair", "lat": 56.8696515, "lng": -4.5097385}, {"name": "Beinn Bheoil", "lat": 56.8133585, "lng": -4.4307055}, {"name": "Beinn Bhreac", "lat": 57.0555073, "lng": -3.5538446}, {"name": "Beinn \u00c8ibhinn", "lat": 56.8260657, "lng": -4.5446673}, {"name": "Beinn Iutharn Mh\u00f2r", "lat": 56.8946236, "lng": -3.5679364}, {"name": "Beinn Mheadhoin", "lat": 57.0959019, "lng": -3.6115092}, {"name": "Ben Alder", "lat": 56.8138805, "lng": -4.4651098}, {"name": "Ben Avon", "lat": 57.0993266, "lng": -3.4345036}, {"name": "Br\u00e0igh Coire Chruinn-bhalgain", "lat": 56.8311161, "lng": -3.7294358}, {"name": "C\u00e0rn a' Chlamain", "lat": 56.8610155, "lng": -3.7796335}, {"name": "C\u00e0rn a' Gh\u00e8oidh", "lat": 56.8731135, "lng": -3.4666936}, {"name": "C\u00e0rn an R\u00ecgh", "lat": 56.8766594, "lng": -3.5953792}, {"name": "C\u00e0rn an Tuirc", "lat": 56.90825, "lng": -3.3576448}, {"name": "C\u00e0rn Aosda", "lat": 56.8957986, "lng": -3.4233044}, {"name": "C\u00e0rn Bhac", "lat": 56.9305487, "lng": -3.560834}, {"name": "C\u00e0rn Dearg (Loch Pattack)", "lat": 56.8553225, "lng": -4.4547833}, {"name": "C\u00e0rn Liath (Beinn a' Ghl\u00f2)", "lat": 56.8076387, "lng": -3.7441969}, {"name": "C\u00e0rn nan Gabhar", "lat": 56.8399345, "lng": -3.688128}, {"name": "Creag Pitridh", "lat": 56.8997889, "lng": -4.4850952}, {"name": "Geal ch\u00e0rn (Laggan)", "lat": 56.8978583, "lng": -4.457579}, {"name": "Geal-ch\u00e0rn (Alder)", "lat": 56.8378726, "lng": -4.5097258}, {"name": "Glas Maol", "lat": 56.8731666, "lng": -3.3683093}, {"name": "Glas Tulaichean", "lat": 56.8658215, "lng": -3.558243}, {"name": "Sg\u00f9rr nan Clach Geala", "lat": 57.6965702, "lng": -5.0482599}, {"name": "Sg\u00f9rr nan Each", "lat": 57.6811149, "lng": -5.046312}, {"name": "The Cairnwell", "lat": 56.8796141, "lng": -3.4212861}], "oliver_only": [{"name": "Am Bodach", "lat": 56.741768, "lng": -4.9835518}, {"name": "An Gearanach", "lat": 56.7592269, "lng": -4.9663371}, {"name": "An Sgarsoch", "lat": 56.9320181, "lng": -3.7544767}, {"name": "Beinn Bhrotain", "lat": 57.0099403, "lng": -3.7237461}, {"name": "Beinn Dearg (Blair Atholl)", "lat": 56.8772524, "lng": -3.88386}, {"name": "Beinn na Lap", "lat": 56.7894612, "lng": -4.6600546}, {"name": "Ben Klibreck", "lat": 58.2352997, "lng": -4.4112048}, {"name": "Binnein Beag", "lat": 56.7671771, "lng": -4.9113023}, {"name": "Binnein M\u00f2r", "lat": 56.7544868, "lng": -4.92598}, {"name": "Cairn Toul", "lat": 57.0545117, "lng": -3.7108084}, {"name": "C\u00e0rn a' Mh\u00e0im", "lat": 57.0369636, "lng": -3.6584488}, {"name": "C\u00e0rn an Fh\u00ecdhleir (C\u00e0rn Ealar)", "lat": 56.9360162, "lng": -3.8016921}, {"name": "C\u00e0rn Dearg (Corrour)", "lat": 56.7603214, "lng": -4.5898237}, {"name": "Chno Dearg", "lat": 56.8301434, "lng": -4.6608988}, {"name": "Monadh M\u00f2r", "lat": 57.026951, "lng": -3.7500851}, {"name": "Mullach nan Coirean", "lat": 56.7498892, "lng": -5.0722259}, {"name": "Na Gruagaichean", "lat": 56.7438495, "lng": -4.9400298}, {"name": "Sg\u00f2r Gaibhre", "lat": 56.7725977, "lng": -4.5464835}, {"name": "Sg\u00f9rr a' Mh\u00e0im", "lat": 56.7560093, "lng": -5.0035978}, {"name": "Sg\u00f9rr \u00c8ilde M\u00f2r", "lat": 56.7501572, "lng": -4.8954665}, {"name": "Stob a' Choire Mheadhoin", "lat": 56.8237184, "lng": -4.7601643}, {"name": "Stob B\u00e0n (Mamores)", "lat": 56.7437482, "lng": -5.0303441}, {"name": "Stob Coire a' Ch\u00e0irn", "lat": 56.7508989, "lng": -4.9694514}, {"name": "Stob Coire Easain", "lat": 56.8182168, "lng": -4.7738247}, {"name": "Stob Coire Sgriodain", "lat": 56.8318348, "lng": -4.6949836}, {"name": "The Devil's Point", "lat": 57.0358028, "lng": -3.6887945}], "dad_only": [{"name": "A' Chailleach (Monadhliath)", "lat": 57.1095484, "lng": -4.1791872}, {"name": "An Caisteal", "lat": 56.3387357, "lng": -4.6244133}, {"name": "Beinn a' Chaorainn (Glen Spean)", "lat": 56.928752, "lng": -4.6537283}, {"name": "Beinn a' Chochuill", "lat": 56.4498446, "lng": -5.0687209}, {"name": "Beinn a' Chr\u00f2in", "lat": 56.3321313, "lng": -4.609612}, {"name": "Beinn Chabhair", "lat": 56.3258987, "lng": -4.6415042}, {"name": "Beinn Eunaich", "lat": 56.4504278, "lng": -5.0267355}, {"name": "Beinn \u00ccme", "lat": 56.2368179, "lng": -4.8171651}, {"name": "Beinn Narnain", "lat": 56.2210057, "lng": -4.7890696}, {"name": "Beinn Sgritheall", "lat": 57.1537454, "lng": -5.5796212}, {"name": "Beinn Teallach", "lat": 56.9360713, "lng": -4.6949301}, {"name": "Beinn Tulaichean", "lat": 56.3422502, "lng": -4.5632888}, {"name": "Ben Chonzie", "lat": 56.453891, "lng": -3.9920263}, {"name": "Ben Cruachan", "lat": 56.4268737, "lng": -5.1318517}, {"name": "Ben Vane", "lat": 56.2498251, "lng": -4.7817583}, {"name": "Ben Vorlich (Loch Earn)", "lat": 56.3427688, "lng": -4.2195371}, {"name": "Ben Vorlich (Loch Lomond)", "lat": 56.2740092, "lng": -4.7549437}, {"name": "C\u00e0rn Dearg (Monadhliath)", "lat": 57.0923397, "lng": -4.2533992}, {"name": "C\u00e0rn Sgulain", "lat": 57.1245845, "lng": -4.1769613}, {"name": "Creag Leacach", "lat": 56.8546762, "lng": -3.3879285}, {"name": "Cruach \u00c0rdrain", "lat": 56.3565325, "lng": -4.5763394}, {"name": "Mount Keen", "lat": 56.9698735, "lng": -2.9736661}, {"name": "Sg\u00f2rr Dhearg (Beinn a' Bheithir)", "lat": 56.65397, "lng": -5.1716628}, {"name": "Sg\u00f2rr Dh\u00f2nuill (Beinn a' Bheithir)", "lat": 56.6506274, "lng": -5.197975}, {"name": "Stob Daimh", "lat": 56.4314719, "lng": -5.0915723}, {"name": "St\u00f9c a' Chr\u00f2in", "lat": 56.3293569, "lng": -4.2377057}], "neither": [{"name": "A' Chralaig", "lat": 57.1842886, "lng": -5.1549699}, {"name": "A' Ghlas-bheinn", "lat": 57.2550649, "lng": -5.3036519}, {"name": "A' Mhaighdean", "lat": 57.7197006, "lng": -5.3468916}, {"name": "A' Mharconaich", "lat": 56.8569974, "lng": -4.2906827}, {"name": "An Riabhachan", "lat": 57.3624913, "lng": -5.1047979}, {"name": "An Socach (Affric)", "lat": 57.2576147, "lng": -5.1713632}, {"name": "An Socach (Mullardoch)", "lat": 57.3503177, "lng": -5.1587836}, {"name": "Aonach Beag (Nevis Range)", "lat": 56.8000611, "lng": -4.9542918}, {"name": "Aonach M\u00f2r", "lat": 56.8130251, "lng": -4.9617973}, {"name": "Beinn a' Chl\u00e8ibh", "lat": 56.3903329, "lng": -4.8356956}, {"name": "Beinn a' Chreachain", "lat": 56.5603692, "lng": -4.6475554}, {"name": "Beinn Achaladair", "lat": 56.5527651, "lng": -4.6919117}, {"name": "Beinn an D\u00f2thaidh", "lat": 56.5302326, "lng": -4.7141588}, {"name": "Beinn Bhuidhe", "lat": 56.3268021, "lng": -4.9068372}, {"name": "Beinn Dearg (Ullapool)", "lat": 57.7865174, "lng": -4.9296889}, {"name": "Beinn D\u00f2rain", "lat": 56.5029479, "lng": -4.7221854}, {"name": "Beinn Dubhchraig", "lat": 56.3913617, "lng": -4.7432222}, {"name": "Beinn Fhada", "lat": 57.2210849, "lng": -5.2834321}, {"name": "Beinn Fhionnlaidh", "lat": 56.6011082, "lng": -5.104986}, {"name": "Beinn Heasgarnich", "lat": 56.5103323, "lng": -4.5792649}, {"name": "Beinn Liath Mh\u00f2r", "lat": 57.512198, "lng": -5.4008856}, {"name": "Beinn Mhanach", "lat": 56.5340457, "lng": -4.6460379}, {"name": "Beinn nan Aighenan", "lat": 56.5203172, "lng": -5.011283}, {"name": "Beinn Sgulaird", "lat": 56.5663212, "lng": -5.1705652}, {"name": "Beinn Tarsuinn", "lat": 57.7021233, "lng": -5.2918623}, {"name": "Beinn Udlamain", "lat": 56.8355671, "lng": -4.3299677}, {"name": "Ben Challum", "lat": 56.4542909, "lng": -4.6198593}, {"name": "Ben Lui", "lat": 56.3980569, "lng": -4.8121782}, {"name": "Ben More (Mull)", "lat": 56.4250022, "lng": -6.014162}, {"name": "Ben More Assynt", "lat": 58.1383696, "lng": -4.8583643}, {"name": "Ben Oss", "lat": 56.3893617, "lng": -4.7756457}, {"name": "Ben Starav", "lat": 56.5391641, "lng": -5.0498572}, {"name": "Bidean nam Bian", "lat": 56.6428682, "lng": -5.0295132}, {"name": "Bidein a' Choire Sheasgaich", "lat": 57.419799, "lng": -5.2504718}, {"name": "C\u00e0rn Ghluasaid", "lat": 57.1660652, "lng": -5.0684571}, {"name": "C\u00e0rn nan Gobhar (Loch Mullardoch)", "lat": 57.3633406, "lng": -5.0244477}, {"name": "C\u00e0rn nan Gobhar (Strathfarrar)", "lat": 57.4525364, "lng": -4.8800484}, {"name": "Ciste Dhubh", "lat": 57.199376, "lng": -5.2091651}, {"name": "Cona' Mheall", "lat": 57.7912093, "lng": -4.9034336}, {"name": "Conival", "lat": 58.135451, "lng": -4.8831687}, {"name": "Creag Mh\u00f2r (Glen Lochay)", "lat": 56.4895766, "lng": -4.6140878}, {"name": "Creise", "lat": 56.6145757, "lng": -4.8720066}, {"name": "Eididh nan Clach Geala", "lat": 57.8136875, "lng": -4.9341013}, {"name": "Fionn Bheinn", "lat": 57.6112935, "lng": -5.1027922}, {"name": "Geal Ch\u00e0rn (Monadhliath)", "lat": 57.0574793, "lng": -4.3735695}, {"name": "Geal-ch\u00e0rn (Drumochter)", "lat": 56.8745545, "lng": -4.304643}, {"name": "Glas Bheinn Mh\u00f2r", "lat": 56.5424562, "lng": -5.0054527}, {"name": "Gleouraich", "lat": 57.0972414, "lng": -5.2379892}, {"name": "Gulvain", "lat": 56.9363073, "lng": -5.284488}, {"name": "Lurg Mh\u00f2r", "lat": 57.4132, "lng": -5.2236345}, {"name": "Maoile Lunndaidh", "lat": 57.4598, "lng": -5.1178}, {"name": "Maol Chean-dearg", "lat": 57.4918548, "lng": -5.4656022}, {"name": "Meall a' Bh\u00f9iridh", "lat": 56.6123617, "lng": -4.8522128}, {"name": "Meall Chuaich", "lat": 56.9638994, "lng": -4.1125054}, {"name": "Meall Dearg (Aonach Eagach)", "lat": 56.6807985, "lng": -5.0031826}, {"name": "Meall Glas", "lat": 56.4556471, "lng": -4.5475744}, {"name": "Meall nan Ceapraichean", "lat": 57.7986568, "lng": -4.9340316}, {"name": "Meall nan Eun", "lat": 56.5613971, "lng": -4.9433387}, {"name": "Moruisg", "lat": 57.4999249, "lng": -5.1707341}, {"name": "Mullach Coire Mhic Fhearchair", "lat": 57.7090918, "lng": -5.2715117}, {"name": "Mullach Fraoch-choire", "lat": 57.2054487, "lng": -5.1556633}, {"name": "Mullach na Dheiragain", "lat": 57.2836808, "lng": -5.1861202}, {"name": "Ruadh Stac M\u00f2r", "lat": 57.7269956, "lng": -5.3292597}, {"name": "Ruadh-stac M\u00f2r (Beinn Eighe)", "lat": 57.5939011, "lng": -5.4294147}, {"name": "S\u00e0il Chaorainn", "lat": 57.1917479, "lng": -5.0913052}, {"name": "Seana Bhr\u00e0igh", "lat": 57.8473805, "lng": -4.8966289}, {"name": "Sg\u00e0irneach Mh\u00f2r", "lat": 56.8284966, "lng": -4.2979242}, {"name": "Sgiath Ch\u00f9il", "lat": 56.4531905, "lng": -4.4957636}, {"name": "Sg\u00f2r na h-Ulaidh", "lat": 56.6199206, "lng": -5.0800735}, {"name": "Sg\u00f2rr nam Fiannaidh (Aonach Eagach)", "lat": 56.6794678, "lng": -5.0373506}, {"name": "Sg\u00f2rr Ruadh", "lat": 57.4986669, "lng": -5.4079179}, {"name": "Sg\u00f9rr a' Chaorachain", "lat": 57.4525907, "lng": -5.1893422}, {"name": "Sg\u00f9rr a' Choire Ghlais", "lat": 57.4441379, "lng": -4.9030182}, {"name": "Sg\u00f9rr a' Mhaoraich", "lat": 57.1058771, "lng": -5.3306601}, {"name": "Sg\u00f9rr B\u00e0n", "lat": 57.7186399, "lng": -5.2661049}, {"name": "Sg\u00f9rr Ch\u00f2innich", "lat": 57.4511483, "lng": -5.2079153}, {"name": "Sg\u00f9rr Fhuar-thuill", "lat": 57.4498129, "lng": -4.9418304}, {"name": "Sg\u00f9rr na Lapaich", "lat": 57.3693128, "lng": -5.0602948}, {"name": "Sg\u00f9rr na Ruaidhe", "lat": 57.4416715, "lng": -4.8525152}, {"name": "Sg\u00f9rr na Sg\u00ecne", "lat": 57.1472094, "lng": -5.3966455}, {"name": "Sg\u00f9rr nan Ceathreamhnan", "lat": 57.2549647, "lng": -5.2227678}, {"name": "Sg\u00f9rr nan Coireachan (Glenfinnan)", "lat": 56.9358278, "lng": -5.448648}, {"name": "Sg\u00f9rr nan Conbhairean", "lat": 57.1777049, "lng": -5.0954674}, {"name": "Sg\u00f9rr Thuilm", "lat": 56.9370616, "lng": -5.3893149}, {"name": "Slioch", "lat": 57.6673344, "lng": -5.3471257}, {"name": "Spidean Coire nan Clach (Beinn Eighe)", "lat": 57.582238, "lng": -5.4036874}, {"name": "Spidean Mialach", "lat": 57.0890386, "lng": -5.1937841}, {"name": "Stob a' Choire Odhair", "lat": 56.5733138, "lng": -4.8383641}, {"name": "Stob Coir an Albannaich", "lat": 56.5550888, "lng": -4.9800967}, {"name": "Stob Coire Raineach (Buachaille Etive Beag)", "lat": 56.6500265, "lng": -4.9516877}, {"name": "Stob Coire Sgreamhach", "lat": 56.6383858, "lng": -5.0104334}, {"name": "Stob Dearg (Buachaille Etive M\u00f2r)", "lat": 56.6462799, "lng": -4.9004077}, {"name": "Stob Dubh (Buachaille Etive Beag)", "lat": 56.6382469, "lng": -4.9707542}, {"name": "Stob Ghabhar", "lat": 56.5681304, "lng": -4.8821076}, {"name": "Stob na Br\u00f2ige  (Buachaille Etive M\u00f2r)", "lat": 56.6300122, "lng": -4.9511659}, {"name": "The Saddle", "lat": 57.1625134, "lng": -5.4147478}, {"name": "Toll Creagach", "lat": 57.3094321, "lng": -4.9991428}]};
+
+const colors = {
+  together:      '#e6c84e',
+  both_separate: '#c45bdb',
+  oliver_only:   '#4da6e8',
+  dad_only:      '#e87c3e',
+  neither:       '#ffffff'
+};
+
+const labels = {
+  together:      'Climbed Together',
+  both_separate: 'Both Climbed, Separately',
+  oliver_only:   'Oliver Only',
+  dad_only:      'Dad Only',
+  neither:       'Neither'
+};
+
+// Mountain triangle SVG icon factory
+function peakIcon(color, size, opacity) {
+  opacity = opacity || 0.9;
+  const w = size;
+  const h = size * 0.9;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">
+    <polygon points="${w/2},1 ${w-1},${h-1} 1,${h-1}"
+      fill="${color}" stroke="#1a1d23" stroke-width="1.5" stroke-linejoin="round"
+      opacity="${opacity}"/>
+  </svg>`;
+  return L.divIcon({
+    html: svg,
+    className: '',
+    iconSize: [w, h],
+    iconAnchor: [w/2, h],
+    popupAnchor: [0, -h + 2]
+  });
+}
+
+const map = L.map('map', {
+  zoomControl: true,
+  attributionControl: true
+}).setView([57.0, -4.9], 7);
+
+L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+  attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>',
+  subdomains: 'abcd',
+  maxZoom: 16
+}).addTo(map);
+
+// Layer groups per category for toggling
+const layers = {};
+const order = ['neither', 'dad_only', 'oliver_only', 'both_separate', 'together'];
+
+order.forEach(cat => {
+  const group = L.layerGroup();
+  const size = 16;
+  const opacity = 0.9;
+  data[cat].forEach(m => {
+    const marker = L.marker([m.lat, m.lng], {
+      icon: peakIcon(colors[cat], size, opacity),
+      title: m.name
+    });
+    marker.bindPopup(`<b>${m.name}</b><div class="popup-cat" style="color: ${colors[cat]}">${labels[cat]}</div>`);
+    marker.on('mouseover', function() { this.openPopup(); });
+    group.addLayer(marker);
+  });
+  group.addTo(map);
+  layers[cat] = group;
+});
+
+// Filter toggle buttons
+document.querySelectorAll('.legend-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const cat = btn.dataset.cat;
+    const isActive = !btn.classList.contains('inactive');
+    if (isActive) {
+      map.removeLayer(layers[cat]);
+      btn.classList.add('inactive');
+    } else {
+      layers[cat].addTo(map);
+      btn.classList.remove('inactive');
+    }
+  });
+});
+
+// CSV download
+function downloadCSV() {
+  const catOrder = ['together', 'both_separate', 'oliver_only', 'dad_only', 'neither'];
+  let csv = 'Munro,Latitude,Longitude,Category\n';
+  catOrder.forEach(cat => {
+    data[cat].forEach(m => {
+      const name = m.name.includes(',') ? '"' + m.name + '"' : m.name;
+      const catLabel = labels[cat].includes(',') ? '"' + labels[cat] + '"' : labels[cat];
+      csv += name + ',' + m.lat + ',' + m.lng + ',' + catLabel + '\n';
+    });
+  });
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'normand_munros.csv';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+</script>
+
+</body>
+</html>
